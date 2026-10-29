@@ -1,5 +1,6 @@
 package cz.upce.fei.nnptp.taskpulse.cli;
 
+import cz.upce.fei.nnptp.taskpulse.domain.Priority;
 import cz.upce.fei.nnptp.taskpulse.service.ProjectService;
 import cz.upce.fei.nnptp.taskpulse.service.TaskService;
 import cz.upce.fei.nnptp.taskpulse.storage.InMemoryProjectRepository;
@@ -10,7 +11,9 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.Scanner;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -82,6 +85,72 @@ class TaskPulseCliTest {
 
         cli.executeLine("task transition " + taskId + " DONE");
         assertThat(outContent.toString()).contains("transitioned to DONE");
+    }
+
+    @Test
+    void taskListWithoutSortOrdersByTitle() {
+        UUID projectId = projectService.createProject("Course", "").getId();
+        taskService.createTask(projectId, "Beta", "", Priority.LOW, null, null);
+        taskService.createTask(projectId, "Alpha", "", Priority.HIGH, null, null);
+
+        cli.executeLine("task list");
+
+        assertThat(outContent.toString()).containsSubsequence("Alpha", "Beta");
+    }
+
+    @Test
+    void taskListSortsByPriority() {
+        UUID projectId = projectService.createProject("Course", "").getId();
+        taskService.createTask(projectId, "Alpha", "", Priority.LOW, null, null);
+        taskService.createTask(projectId, "Beta", "", Priority.CRITICAL, null, null);
+        taskService.createTask(projectId, "Gamma", "", Priority.MEDIUM, null, null);
+
+        cli.executeLine("task list --sort priority");
+
+        assertThat(outContent.toString()).containsSubsequence("Beta", "Gamma", "Alpha");
+    }
+
+    @Test
+    void taskListSortsByDueDateWithMissingDatesLast() {
+        UUID projectId = projectService.createProject("Course", "").getId();
+        taskService.createTask(projectId, "Alpha", "", Priority.MEDIUM, null, null);
+        taskService.createTask(projectId, "Beta", "", Priority.MEDIUM, null, LocalDate.of(2026, 12, 1));
+        taskService.createTask(projectId, "Gamma", "", Priority.MEDIUM, null, LocalDate.of(2026, 11, 1));
+
+        cli.executeLine("task list --sort duedate");
+
+        assertThat(outContent.toString()).containsSubsequence("Gamma", "Beta", "Alpha");
+    }
+
+    @Test
+    void taskListSortsByPriorityThenDueDate() {
+        UUID projectId = projectService.createProject("Course", "").getId();
+        taskService.createTask(projectId, "Alpha", "", Priority.HIGH, null, LocalDate.of(2026, 12, 1));
+        taskService.createTask(projectId, "Beta", "", Priority.LOW, null, LocalDate.of(2026, 10, 1));
+        taskService.createTask(projectId, "Gamma", "", Priority.HIGH, null, LocalDate.of(2026, 11, 1));
+
+        cli.executeLine("task list --sort priority-duedate");
+
+        assertThat(outContent.toString()).containsSubsequence("Gamma", "Alpha", "Beta");
+    }
+
+    @Test
+    void taskListSortValueIsCaseInsensitive() {
+        UUID projectId = projectService.createProject("Course", "").getId();
+        taskService.createTask(projectId, "Alpha", "", Priority.LOW, null, null);
+        taskService.createTask(projectId, "Beta", "", Priority.HIGH, null, null);
+
+        cli.executeLine("task list --sort PRIORITY");
+
+        assertThat(errContent.toString()).isEmpty();
+        assertThat(outContent.toString()).containsSubsequence("Beta", "Alpha");
+    }
+
+    @Test
+    void taskListWithInvalidSortDisplaysAllowedValues() {
+        cli.executeLine("task list --sort size");
+
+        assertThat(errContent.toString()).contains("Invalid sort order: 'size'", "title", "priority", "duedate", "priority-duedate");
     }
 
     @Test
