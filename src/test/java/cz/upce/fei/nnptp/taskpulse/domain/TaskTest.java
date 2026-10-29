@@ -96,6 +96,17 @@ class TaskTest {
     }
 
     @Test
+    void rejectLabelContainingSemicolon() {
+        UUID projectId = UUID.randomUUID();
+        Task task = new Task(projectId, "Title");
+
+        assertThatThrownBy(() -> task.addLabel("frontend;backend"))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(";");
+        assertThat(task.getLabels()).isEmpty();
+    }
+
+    @Test
     void overdueCalculation() {
         UUID projectId = UUID.randomUUID();
         Task task = new Task(projectId, "Title");
