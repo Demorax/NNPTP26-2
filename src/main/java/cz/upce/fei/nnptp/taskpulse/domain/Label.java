@@ -12,6 +12,9 @@ public final class Label {
         if (raw == null || raw.isBlank()) {
             throw new ValidationException("Label must not be blank");
         }
+        if (raw.contains(";")) {
+            throw new ValidationException("Label must not contain ';', got: '" + raw + "'");
+        }
         return raw.strip().toLowerCase(Locale.ROOT);
     }
 }
